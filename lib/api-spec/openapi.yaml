@@ -3,20 +3,23 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Pace Running Tracker API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: runs
+    description: Run operations
+  - name: stats
+    description: Statistics operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +27,182 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /runs:
+    get:
+      operationId: listRuns
+      tags: [runs]
+      summary: List all runs
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Filter by name or type
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: Max results
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: Offset for pagination
+      responses:
+        "200":
+          description: List of runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Run"
+    post:
+      operationId: createRun
+      tags: [runs]
+      summary: Create a run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunInput"
+      responses:
+        "201":
+          description: Created run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+
+  /runs/recent:
+    get:
+      operationId: getRecentRuns
+      tags: [runs]
+      summary: Get recent runs for dashboard
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: Number of recent runs to return
+      responses:
+        "200":
+          description: Recent runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Run"
+
+  /runs/{id}:
+    get:
+      operationId: getRun
+      tags: [runs]
+      summary: Get a run by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Run details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateRun
+      tags: [runs]
+      summary: Update a run
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunUpdate"
+      responses:
+        "200":
+          description: Updated run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteRun
+      tags: [runs]
+      summary: Delete a run
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stats/summary:
+    get:
+      operationId: getStatsSummary
+      tags: [stats]
+      summary: Get dashboard stats summary
+      responses:
+        "200":
+          description: Stats summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsSummary"
+
+  /stats/history:
+    get:
+      operationId: getStatsHistory
+      tags: [stats]
+      summary: Get distance history for chart
+      parameters:
+        - in: query
+          name: range
+          schema:
+            type: string
+            enum: [7d, 30d, 3m, 6m, 1y, all]
+          description: Time range
+      responses:
+        "200":
+          description: History data points
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsHistory"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +213,209 @@ components:
       required:
         - status
 
+    Run:
+      type: object
+      required: [id, type, distance, duration, pace, date, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: ["string", "null"]
+        type:
+          type: string
+          enum: [Easy, Tempo, Long, Recovery, Interval]
+        distance:
+          type: number
+          description: Distance in km
+        duration:
+          type: integer
+          description: Duration in seconds
+        pace:
+          type: number
+          description: Pace in seconds per km
+        calories:
+          type: ["integer", "null"]
+        elevation:
+          type: ["integer", "null"]
+          description: Elevation gain in meters (placeholder)
+        date:
+          type: string
+          description: ISO datetime of run
+        route:
+          type: ["string", "null"]
+          description: JSON array of [lat, lng] coordinates
+        splits:
+          type: ["string", "null"]
+          description: JSON array of per-km split times in seconds
+        createdAt:
+          type: string
+
+    RunInput:
+      type: object
+      required: [type, distance, duration, date]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [Easy, Tempo, Long, Recovery, Interval]
+        distance:
+          type: number
+        duration:
+          type: integer
+        calories:
+          type: integer
+        elevation:
+          type: integer
+        date:
+          type: string
+        route:
+          type: string
+          description: JSON array of [lat, lng] coordinates
+        splits:
+          type: string
+
+    RunUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [Easy, Tempo, Long, Recovery, Interval]
+        distance:
+          type: number
+        duration:
+          type: integer
+        calories:
+          type: integer
+        elevation:
+          type: integer
+        date:
+          type: string
+        route:
+          type: string
+        splits:
+          type: string
+
+    StatsSummary:
+      type: object
+      required: [thisWeek, lastWeek, allTime, weekProgress, personalRecords, weeklyRunDays]
+      properties:
+        thisWeek:
+          $ref: "#/components/schemas/WeekStats"
+        lastWeek:
+          $ref: "#/components/schemas/WeekStats"
+        allTime:
+          $ref: "#/components/schemas/AllTimeStats"
+        weekProgress:
+          $ref: "#/components/schemas/WeekProgress"
+        personalRecords:
+          $ref: "#/components/schemas/PersonalRecords"
+        weeklyRunDays:
+          type: array
+          items:
+            $ref: "#/components/schemas/DayStatus"
+
+    WeekStats:
+      type: object
+      required: [distance, duration, runs, elevation]
+      properties:
+        distance:
+          type: number
+        duration:
+          type: integer
+        runs:
+          type: integer
+        elevation:
+          type: integer
+
+    AllTimeStats:
+      type: object
+      required: [distance, duration, runs]
+      properties:
+        distance:
+          type: number
+        duration:
+          type: integer
+        runs:
+          type: integer
+
+    WeekProgress:
+      type: object
+      required: [completed, goal, percentage]
+      properties:
+        completed:
+          type: integer
+        goal:
+          type: integer
+        percentage:
+          type: number
+
+    PersonalRecords:
+      type: object
+      properties:
+        fastest5k:
+          type: ["number", "null"]
+          description: Pace in seconds per km
+        fastest10k:
+          type: ["number", "null"]
+        longestRun:
+          type: ["number", "null"]
+          description: Distance in km
+        longestDuration:
+          type: ["integer", "null"]
+          description: Duration in seconds
+
+    DayStatus:
+      type: object
+      required: [date, dayLabel, hasRun, isToday]
+      properties:
+        date:
+          type: string
+        dayLabel:
+          type: string
+        hasRun:
+          type: boolean
+        isToday:
+          type: boolean
+
+    StatsHistory:
+      type: object
+      required: [points, runsPerDayOfWeek]
+      properties:
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoryPoint"
+        runsPerDayOfWeek:
+          type: array
+          items:
+            $ref: "#/components/schemas/DayOfWeekCount"
+
+    HistoryPoint:
+      type: object
+      required: [date, distance, runs]
+      properties:
+        date:
+          type: string
+        distance:
+          type: number
+        runs:
+          type: integer
+
+    DayOfWeekCount:
+      type: object
+      required: [day, count]
+      properties:
+        day:
+          type: string
+        count:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
